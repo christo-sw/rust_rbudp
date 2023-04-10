@@ -1,5 +1,5 @@
 use std::{net::{TcpStream, TcpListener}, io::Read};
-use std::{str, thread, time::Duration};
+use std::{str, thread};
 
 fn main() {
     let listener = TcpListener::bind("localhost:5050").unwrap();
@@ -30,6 +30,5 @@ fn handle_tcp_flagging(mut stream: TcpStream) {
 fn handle_udp_receiving() {
     for i in 1..10 {
         println!("Hello {} from receiver UDP thread!", i);
-        thread::sleep(Duration::from_secs(1));
     }
 }
