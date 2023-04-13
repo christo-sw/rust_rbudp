@@ -2,7 +2,7 @@ use std::net::{SocketAddr, UdpSocket};
 use std::thread;
 use std::{io::Write, net::TcpStream};
 
-mod lib;
+mod file_handler;
 
 const PACKET_SIZE: usize = 512;
 
@@ -34,18 +34,20 @@ fn handle_tcp_flagging(mut stream: TcpStream) {
 
 fn handle_udp_sending() {
     // Open file to send
+    let mut reader = file_handler::get_file_reader("data/test2.txt");
 
     // Setup UDP sending
-    //let udp_socket = UdpSocket::bind("localhost:5051").unwrap();
-    let mut reader = get_file_reader("data/test2.txt");
-
+    let udp_socket = UdpSocket::bind("localhost:5051").unwrap();
+    let target_address: SocketAddr = "127.0.0.1:5052".parse().unwrap();
 
     let mut buf = [0 as u8; PACKET_SIZE];
-    //let target_address: SocketAddr = "localhost:5051".parse().unwrap();
+    let mut amount = file_handler::read_buf_from_file(&mut reader, &mut buf);
 
-   // while read_bytes_from_file(&mut reader, &mut buf) {
-        //udp_socket.send_to(&buf, target_address).unwrap();
-    //    dbg!(buf);
-    //}
+    while amount == buf.len() {
+        udp_socket.send_to(&buf, target_address).unwrap();
+        amount = file_handler::read_buf_from_file(&mut reader, &mut buf);
+    }
+
+    // Send final few bytes left in buffer
+    udp_socket.send_to(&buf, target_address).unwrap();
 }
-

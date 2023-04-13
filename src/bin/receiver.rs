@@ -1,5 +1,7 @@
-use std::{net::{TcpStream, TcpListener}, io::Read};
+use std::{net::{TcpStream, TcpListener, UdpSocket}, io::{Read, Write}, sync::atomic::AtomicBool};
 use std::{str, thread};
+
+const PACKET_SIZE: usize = 512;
 
 fn main() {
     let listener = TcpListener::bind("localhost:5050").unwrap();
@@ -18,17 +20,22 @@ fn handle_tcp_flagging(mut stream: TcpStream) {
 
     println!("Message from sender: {}", print_str);
 
+    let running = AtomicBool::new(true);
+
     // Start new thread for UDP receiving
-    let handle = thread::spawn(|| {
-        handle_udp_receiving();
+    let handle = thread::spawn(move|| {
+        handle_udp_receiving(&running);
     });
 
     // Wait for UDP thread to stop executing
     handle.join().unwrap();
 }
 
-fn handle_udp_receiving() {
-    for i in 1..10 {
-        println!("Hello {} from receiver UDP thread!", i);
+fn handle_udp_receiving(running: &AtomicBool) {
+    let udp_socket = UdpSocket::bind("localhost:5052").unwrap();
+    let mut buf = [0 as u8; PACKET_SIZE];
+    
+    loop {
+        udp_socket.recv(&mut buf).unwrap();
     }
 }
