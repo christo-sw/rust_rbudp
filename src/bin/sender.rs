@@ -19,7 +19,7 @@ fn main() {
 }
 
 fn handle_tcp_flagging(mut stream: TcpStream) {
-    let filename = "data/test2.txt";
+    let filename = "data/test1.txt";
     let amount = stream
         .write(filename.as_bytes())
         .expect("Error writing filename receiver");
@@ -42,7 +42,7 @@ fn handle_tcp_flagging(mut stream: TcpStream) {
 
 fn handle_udp_sending() {
     // Open file to send
-    let mut reader = file_handler::get_file_reader("data/test2.txt");
+    let mut reader = file_handler::get_file_reader("data/test1.txt");
 
     // Setup UDP sending
     let udp_socket = UdpSocket::bind("localhost:5051").unwrap();
