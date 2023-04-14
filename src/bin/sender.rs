@@ -1,5 +1,6 @@
 use std::net::{SocketAddr, UdpSocket};
 use std::thread;
+use std::time::Duration;
 use std::{io::Write, net::TcpStream};
 
 mod file_handler;
@@ -18,10 +19,10 @@ fn main() {
 }
 
 fn handle_tcp_flagging(mut stream: TcpStream) {
-    let greeting = "hello there!";
+    let filename = "data/test2.txt";
     stream
-        .write(greeting.as_bytes())
-        .expect("Error writing to receiver");
+        .write(filename.as_bytes())
+        .expect("Error writing filename receiver");
 
     // Create a new thread to handle UDP sending
     let handle = thread::spawn(|| {
@@ -40,7 +41,7 @@ fn handle_tcp_flagging(mut stream: TcpStream) {
 
 fn handle_udp_sending() {
     // Open file to send
-    let mut reader = file_handler::get_file_reader("data/test1.txt");
+    let mut reader = file_handler::get_file_reader("data/test2.txt");
 
     // Setup UDP sending
     let udp_socket = UdpSocket::bind("localhost:5051").unwrap();
@@ -61,12 +62,16 @@ fn handle_udp_sending() {
         packet[i] = buf[i - PACKET_NUM_SIZE];
     }
 
+    // TODO: comment this out to check if resending works for first packet
+    thread::sleep(Duration::from_secs(1));
+
     while amount == buf.len() {
         udp_socket.send_to(&packet, target_address).unwrap();
         println!("DEBUG: Sent packet {}", count);
-        amount = file_handler::read_buf_from_file(&mut reader, &mut buf);
 
         count += 1;
+        amount = file_handler::read_buf_from_file(&mut reader, &mut buf);
+
         count_bytes = count.to_le_bytes();
 
         for i in 0..PACKET_NUM_SIZE {
@@ -76,6 +81,7 @@ fn handle_udp_sending() {
         for i in PACKET_NUM_SIZE..PACKET_SIZE {
             packet[i] = buf[i - PACKET_NUM_SIZE];
         }
+
     }
 
     // Send final few bytes left in buffer
