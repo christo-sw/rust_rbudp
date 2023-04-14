@@ -28,14 +28,15 @@ fn main() {
 }
 
 fn handle_tcp_flagging(mut stream: TcpStream) {
-    let mut filename_as_bytes: Vec<u8> = vec![]; 
-    stream
-        .read(&mut filename_as_bytes)
+    let mut filepath_as_bytes = [0 as u8; 256]; 
+    let amount = stream
+        .read(&mut filepath_as_bytes)
         .expect("Error reading filename from sender");
+    let filepath_as_bytes_slice = &filepath_as_bytes[0..amount];
 
-
-    let filename: String = String::from_utf8(filename_as_bytes).unwrap();
-    println!("Filename: {}", filename);
+    let filepath: String = String::from_utf8(filepath_as_bytes_slice.to_vec()).unwrap();
+    let collection: Vec<&str> = filepath.split("/").collect();
+    let filename = collection.last().unwrap().to_string();
 
     let running = Arc::new(AtomicBool::new(true));
     let running_clone = running.clone();
@@ -61,9 +62,8 @@ fn handle_tcp_flagging(mut stream: TcpStream) {
 
 fn handle_udp_receiving(running: &Arc<AtomicBool>, filename: String) {
     // Open file to write to
-    let collection: Vec<&str> = filename.split("/").collect();
-    dbg!(collection);
-    let mut writer = file_handler::get_file_writer("output/test2out.txt");
+    println!("DEBUG: filename is {}", filename);
+    let mut writer = file_handler::get_file_writer(filename);
 
     // Setup UDP receiving
     let udp_socket = UdpSocket::bind("localhost:5052").unwrap();

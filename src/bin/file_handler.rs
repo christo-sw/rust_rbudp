@@ -9,7 +9,7 @@ use std::{
 fn main() {
     // Get reader from filename
     let mut reader = get_file_reader("data/test2.txt");
-    let mut writer = get_file_writer("output/test1out.txt");
+    let mut writer = get_file_writer("output/test1out.txt".to_string());
     let mut buf = [0 as u8; 512];
 
     // Test
@@ -44,7 +44,7 @@ pub fn get_file_reader(filename: &str) -> BufReader<File> {
 /**
  * Get a buffered writer for the specified file name.
  */
-pub fn get_file_writer(filename: &str) -> BufWriter<File> {
+pub fn get_file_writer(filename: String) -> BufWriter<File> {
     let file = match File::create(filename) {
         Ok(file) => file,
         Err(e) => panic!("Error opening file: {}", e),

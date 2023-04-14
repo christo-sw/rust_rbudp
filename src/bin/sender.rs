@@ -20,9 +20,10 @@ fn main() {
 
 fn handle_tcp_flagging(mut stream: TcpStream) {
     let filename = "data/test2.txt";
-    stream
+    let amount = stream
         .write(filename.as_bytes())
         .expect("Error writing filename receiver");
+    println!("amount written {}", amount);
 
     // Create a new thread to handle UDP sending
     let handle = thread::spawn(|| {
