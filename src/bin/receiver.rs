@@ -4,6 +4,10 @@ use std::{str, thread};
 const PACKET_SIZE: usize = 512;
 
 fn main() {
+    //let num: u32 = 65000;
+    //let bytes = num.to_le_bytes();
+    //let num_from_bytes = u32::from_le_bytes(bytes);
+
     let listener = TcpListener::bind("localhost:5050").unwrap();
     println!("Receiver listening on port {}", listener.local_addr().unwrap().port());
 
@@ -33,9 +37,9 @@ fn handle_tcp_flagging(mut stream: TcpStream) {
 
 fn handle_udp_receiving(running: &AtomicBool) {
     let udp_socket = UdpSocket::bind("localhost:5052").unwrap();
-    let mut buf = [0 as u8; PACKET_SIZE];
+    let mut packet = [0 as u8; PACKET_SIZE];
     
-    loop {
-        udp_socket.recv(&mut buf).unwrap();
+    while running.load(Ordering::Relaxed) {
+        udp_socket.recv(&mut packet).unwrap();
     }
 }

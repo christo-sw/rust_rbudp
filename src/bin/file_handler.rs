@@ -3,8 +3,6 @@ use std::{
     io::{BufReader, BufWriter, Read, Write},
 };
 
-const PACKET_SIZE: usize = 512;
-
 /**
  * This method is for testing purposes only.
  */
@@ -12,7 +10,7 @@ fn main() {
     // Get reader from filename
     let mut reader = get_file_reader("data/test2.txt");
     let mut writer = get_file_writer("output/test1out.txt");
-    let mut buf = [0 as u8; PACKET_SIZE];
+    let mut buf = [0 as u8; 512];
 
     // Test
     let mut count = 0;
@@ -59,7 +57,7 @@ pub fn get_file_writer(filename: &str) -> BufWriter<File> {
  * Attempts to read PACKET_SIZE bytes from specified reader, returning true if a full
  * buffer was read, and false otherwise (implying that the file has reached its end).
  */
-pub fn read_buf_from_file(reader: &mut BufReader<File>, buf: &mut [u8; PACKET_SIZE]) -> usize {
+pub fn read_buf_from_file(reader: &mut BufReader<File>, buf: &mut [u8]) -> usize {
     // Reset buffer to avoid contamination at EOF read
     buf.fill(0);
 
@@ -74,7 +72,7 @@ pub fn read_buf_from_file(reader: &mut BufReader<File>, buf: &mut [u8; PACKET_SI
  * Attempts to write PACKET_SIZE bytes from buffer to the file, returning
  * the amount of bytes actually written.
  */
-pub fn write_buf_to_file(writer: &mut BufWriter<File>, buf: &[u8; PACKET_SIZE]) -> usize {
+pub fn write_buf_to_file(writer: &mut BufWriter<File>, buf: &[u8]) -> usize {
     // Write from buffer to file
     let amount = match writer.write(buf) {
         Ok(amount) => amount,
@@ -90,7 +88,7 @@ pub fn write_buf_to_file(writer: &mut BufWriter<File>, buf: &[u8; PACKET_SIZE]) 
  */
 pub fn write_num_bytes_from_buf_to_file(
     writer: &mut BufWriter<File>,
-    buf: &[u8; PACKET_SIZE],
+    buf: &[u8],
     num: usize,
 ) -> bool {
     let slice = &buf[0..num];

@@ -5,6 +5,7 @@ use std::{io::Write, net::TcpStream};
 mod file_handler;
 
 const PACKET_SIZE: usize = 512;
+const PACKET_NUM_SIZE: usize = 4;
 
 fn main() {
     println!("Hello from sender!");
@@ -40,14 +41,37 @@ fn handle_udp_sending() {
     let udp_socket = UdpSocket::bind("localhost:5051").unwrap();
     let target_address: SocketAddr = "127.0.0.1:5052".parse().unwrap();
 
-    let mut buf = [0 as u8; PACKET_SIZE];
+    let mut packet = [0 as u8; PACKET_SIZE];
+
+    let mut buf = [0 as u8; PACKET_SIZE - PACKET_NUM_SIZE];
+    let mut count: u32 = 0;
+    let mut count_bytes = count.to_le_bytes();
+
     let mut amount = file_handler::read_buf_from_file(&mut reader, &mut buf);
+    for i in 0..PACKET_NUM_SIZE {
+        packet[i] = count_bytes[i];
+    }
+
+    for i in PACKET_NUM_SIZE..PACKET_SIZE {
+        packet[i] = buf[i - PACKET_NUM_SIZE];
+    }
 
     while amount == buf.len() {
-        udp_socket.send_to(&buf, target_address).unwrap();
+        udp_socket.send_to(&packet, target_address).unwrap();
         amount = file_handler::read_buf_from_file(&mut reader, &mut buf);
+
+        count += 1;
+        count_bytes = count.to_le_bytes();
+
+        for i in 0..PACKET_NUM_SIZE {
+            packet[i] = count_bytes[i];
+        }
+
+        for i in PACKET_NUM_SIZE..PACKET_SIZE {
+            packet[i] = buf[i - PACKET_NUM_SIZE];
+        }
     }
 
     // Send final few bytes left in buffer
-    udp_socket.send_to(&buf, target_address).unwrap();
+    udp_socket.send_to(&packet, target_address).unwrap();
 }
