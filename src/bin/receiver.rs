@@ -6,7 +6,6 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    thread,
     time::Duration,
 };
 
@@ -14,6 +13,7 @@ mod file_handler;
 
 const PACKET_SIZE: usize = 512;
 const PACKET_NUM_SIZE: usize = 4;
+const PACKET_DATA_SIZE: usize = PACKET_SIZE - PACKET_NUM_SIZE;
 
 fn main() {
     let listener = TcpListener::bind("localhost:5050").unwrap();
@@ -24,43 +24,17 @@ fn main() {
 
     let (stream, address) = listener.accept().unwrap();
     println!("Sender connected on address: {}", address);
-    handle_tcp_flagging(stream);
+    handle_transfer(stream);
 }
 
-fn handle_tcp_flagging(mut stream: TcpStream) {
-    let mut filepath_as_bytes = [0 as u8; 256]; 
+fn handle_transfer(mut stream: TcpStream) {
+    let mut filename_as_bytes = [0 as u8; 256];
     let amount = stream
-        .read(&mut filepath_as_bytes)
+        .read(&mut filename_as_bytes)
         .expect("Error reading filename from sender");
-    let filepath_as_bytes_slice = &filepath_as_bytes[0..amount];
+    let filename_as_bytes_slice = &filename_as_bytes[0..amount];
+    let filename: String = String::from_utf8(filename_as_bytes_slice.to_vec()).unwrap();
 
-    let filepath: String = String::from_utf8(filepath_as_bytes_slice.to_vec()).unwrap();
-    let collection: Vec<&str> = filepath.split("/").collect();
-    let filename = collection.last().unwrap().to_string();
-
-    let running = Arc::new(AtomicBool::new(true));
-    let running_clone = running.clone();
-
-    // Start new thread for UDP receiving
-    let handle = thread::spawn(move || {
-        handle_udp_receiving(&running_clone, filename);
-    });
-
-    let mut msg = String::new();
-    stream
-        .read_to_string(&mut msg)
-        .expect("Error reading from sender");
-    println!("DEBUG: Received message from sender: {}", msg);
-    if msg.eq("stop") {
-        println!("stopping");
-        running.store(false, Ordering::Relaxed);
-    }
-
-    // Wait for UDP thread to stop executing
-    handle.join().unwrap();
-}
-
-fn handle_udp_receiving(running: &Arc<AtomicBool>, filename: String) {
     // Open file to write to
     println!("DEBUG: filename is {}", filename);
     let mut writer = file_handler::get_file_writer(filename);
@@ -71,29 +45,22 @@ fn handle_udp_receiving(running: &Arc<AtomicBool>, filename: String) {
         .set_read_timeout(Some(Duration::from_millis(100)))
         .unwrap();
 
-    // TODO: implement sliding window and packet backup
-
+    // Setup and instantiate UDP variables
     let mut packet = [0 as u8; PACKET_SIZE];
-    let mut packet_num: u32;
-    let mut packet_num_as_bytes = [0 as u8; PACKET_NUM_SIZE];
-    let mut buf = [0 as u8; PACKET_SIZE - PACKET_NUM_SIZE];
+    let mut buf = [0 as u8; PACKET_DATA_SIZE];
+    let mut packet_num: u32 = 0;
     let mut count = 0;
 
+    let mut running = true;
+
+    // TODO: implement sliding window and packet backup
     // Receive data
-    while running.load(Ordering::Relaxed) {
+    while running {
         // Try receiving a packet from the sender
         match udp_socket.recv(&mut packet) {
             Ok(_) => {
                 // Get packet num and data (as buf)
-                for i in 0..PACKET_NUM_SIZE {
-                    packet_num_as_bytes[i] = packet[i];
-                }
-
-                for i in PACKET_NUM_SIZE..PACKET_SIZE {
-                    buf[i - PACKET_NUM_SIZE] = packet[i];
-                }
-
-                packet_num = u32::from_le_bytes(packet_num_as_bytes);
+                unpack_packet(&packet, &mut packet_num, &mut buf);
                 println!("DEBUG: Received packet {}", packet_num);
 
                 // Write the packet to file
@@ -105,9 +72,36 @@ fn handle_udp_receiving(running: &Arc<AtomicBool>, filename: String) {
             Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                 continue;
             }
-            Err(e) => panic!("Encountered IO error: {e}"),
+            Err(e) => panic!("Encountered IO Error: {}", e),
         };
     }
 
-    // TODO: reopen file and remove trailing 0s
+    println!("DEBUG: received a total of {} packets", count);
+
+    // Check for incoming message
+    let mut msg = String::new();
+    stream
+        .read_to_string(&mut msg)
+        .expect("Error reading from sender");
+    println!("DEBUG: Received message from sender: {}", msg);
+    if msg.eq("stop") {
+        println!("stopping");
+    }
+}
+
+fn unpack_packet(
+    packet: &[u8; PACKET_SIZE],
+    packet_num: &mut u32,
+    buf: &mut [u8; PACKET_DATA_SIZE],
+) {
+    let mut packet_num_as_bytes = [0 as u8; PACKET_NUM_SIZE];
+    for i in 0..PACKET_NUM_SIZE {
+        packet_num_as_bytes[i] = packet[i];
+    }
+
+    for i in PACKET_NUM_SIZE..PACKET_SIZE {
+        buf[i - PACKET_NUM_SIZE] = packet[i];
+    }
+
+    *packet_num = u32::from_le_bytes(packet_num_as_bytes);
 }
