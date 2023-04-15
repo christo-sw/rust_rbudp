@@ -1,11 +1,6 @@
 use std::{
     io::{ErrorKind, Read},
     net::{TcpListener, TcpStream, UdpSocket},
-    str,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
     time::Duration,
 };
 
@@ -14,6 +9,7 @@ mod file_handler;
 const PACKET_SIZE: usize = 512;
 const PACKET_NUM_SIZE: usize = 4;
 const PACKET_DATA_SIZE: usize = PACKET_SIZE - PACKET_NUM_SIZE;
+const WINDOW_SIZE: usize = 8;
 
 fn main() {
     let listener = TcpListener::bind("localhost:5050").unwrap();
@@ -40,6 +36,9 @@ fn handle_transfer(mut stream: TcpStream) {
     let mut writer = file_handler::get_file_writer(filename);
 
     // Setup UDP receiving
+    stream
+        .set_read_timeout(Some(Duration::from_millis(100)))
+        .unwrap();
     let udp_socket = UdpSocket::bind("localhost:5052").unwrap();
     udp_socket
         .set_read_timeout(Some(Duration::from_millis(100)))
@@ -51,32 +50,42 @@ fn handle_transfer(mut stream: TcpStream) {
     let mut packet_num: u32 = 0;
     let mut count = 0;
 
+    // Setup and instantiate sliding window variables
+    let mut recvd_packet_nums_bytes = [0 as u8; PACKET_NUM_SIZE*WINDOW_SIZE];
+    let mut start = 0;
+    let mut end = WINDOW_SIZE - 1; // TODO: check if this should not be -1
+
     let mut running = true;
 
     // TODO: implement sliding window and packet backup
     // Receive data
     while running {
         // Try receiving a packet from the sender
-        match udp_socket.recv(&mut packet) {
-            Ok(_) => {
-                // Get packet num and data (as buf)
-                unpack_packet(&packet, &mut packet_num, &mut buf);
-                println!("DEBUG: Received packet {}", packet_num);
+        for i in 0..WINDOW_SIZE {
+            match udp_socket.recv(&mut packet) {
+                Ok(_) => {
+                    // Get packet num and data (as buf)
+                    unpack_packet(&packet, &mut packet_num, &mut buf);
 
-                // Write the packet to file
-                file_handler::write_buf_to_file(&mut writer, &buf);
+                    println!("DEBUG: Received packet {}", packet_num);
 
-                // Increase received packet count
-                count += 1;
-            }
-            Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
-                continue;
-            }
-            Err(e) => panic!("Encountered IO Error: {}", e),
-        };
+                    // Write the packet to file
+                    file_handler::write_buf_to_file(&mut writer, &buf);
+
+                    // Increase received packet count
+                    count += 1;
+                }
+                Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                    continue;
+                }
+                Err(e) => panic!("Encountered IO Error: {}", e),
+            };
+        }
     }
 
     println!("DEBUG: received a total of {} packets", count);
+
+    //TODO: reopen file and trim to size (num bytes) sent by sender
 
     // Check for incoming message
     let mut msg = String::new();

@@ -1,5 +1,8 @@
 use std::net::{SocketAddr, UdpSocket};
-use std::{io::Write, net::TcpStream};
+use std::{
+    io::{Read, Write},
+    net::TcpStream,
+};
 
 mod file_handler;
 
@@ -42,18 +45,40 @@ fn rbudp_transfer(mut stream: TcpStream) {
     let mut packet_num: u32 = 0;
     let mut num_bytes_read = PACKET_DATA_SIZE;
 
+    // Setup and instantiate sliding window variables
+    let mut window_packets = [[0 as u8; PACKET_SIZE]; WINDOW_SIZE];
+    let mut sent_packet_nums_bytes = [0 as u8; PACKET_NUM_SIZE*WINDOW_SIZE];
+    let mut start = 0;
+    let mut end = WINDOW_SIZE - 1;
+
     // Main loop
+    // TODO: change to loop based on WINDOW_SIZE*PACKET_DATA_SIZE data left in file
     while num_bytes_read == PACKET_DATA_SIZE {
-        // Read data, create packet, and send
-        num_bytes_read = file_handler::read_buf_from_file(&mut reader, &mut buf);
-        pack_packet(&mut packet, &packet_num, &buf);
-        udp_socket.send_to(&packet, target_address).unwrap();
+        // Read window's packets data, create the packets, and send
+        for i in 0..WINDOW_SIZE {
+            num_bytes_read = file_handler::read_buf_from_file(&mut reader, &mut buf);
+            pack_packet(&mut packet, &packet_num, &buf);
+            window_packets[i] = packet;
+            udp_socket.send_to(&packet, target_address).unwrap();
 
-        println!("DEBUG: Sent packet {}", packet_num);
+            println!("DEBUG: Sent packet {}", packet_num);
 
-        // Increase counts
-        packet_num += 1;
-        count += 1;
+            // Increase counts
+            packet_num += 1;
+            count += 1;
+        }
+
+        // Populate sent packets list as byte arrays
+        for i in 0..WINDOW_SIZE {
+            for j in 0..PACKET_NUM_SIZE {
+                sent_packet_nums_bytes[i + j] = window_packets[i][j];
+            }
+        }
+
+        // Send list of sent packets
+        stream.write(&sent_packet_nums_bytes).unwrap();
+
+        // Wait for tcp confirmation of received packets
     }
 
     println!("DEBUG: sent a total of {} packets", count);
@@ -65,11 +90,7 @@ fn rbudp_transfer(mut stream: TcpStream) {
     println!("Sent stop signal");
 }
 
-fn pack_packet(
-    packet: &mut [u8; PACKET_SIZE],
-    packet_num: &u32,
-    buf: &[u8; PACKET_DATA_SIZE],
-) {
+fn pack_packet(packet: &mut [u8; PACKET_SIZE], packet_num: &u32, buf: &[u8; PACKET_DATA_SIZE]) {
     // Convert count to byte array for stuffing into packet
     let packet_num_bytes = packet_num.to_le_bytes();
 
