@@ -42,7 +42,7 @@ fn rbudp_transfer(mut stream: TcpStream) {
     let mut packet = [0 as u8; PACKET_SIZE];
     let mut buf = [0 as u8; PACKET_DATA_SIZE];
     let mut count = 0;
-    let mut packet_num: u32 = 0;
+    let mut packet_num: u32 = 1; // Starts with packet number 1
     let mut num_bytes_read = PACKET_DATA_SIZE;
 
     // Setup and instantiate sliding window variables
@@ -79,6 +79,7 @@ fn rbudp_transfer(mut stream: TcpStream) {
         stream.write(&sent_packet_nums_bytes).unwrap();
 
         // Wait for tcp confirmation of received packets
+        // while stream.read() != null
     }
 
     println!("DEBUG: sent a total of {} packets", count);
