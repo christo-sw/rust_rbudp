@@ -99,13 +99,13 @@ fn handle_transfer(mut stream: TcpStream) {
         get_packet_nums(&mut alleged_packet_nums, &alleged_packet_nums_bytes);
 
         // Compare with list of actually received packet numbers
-        if get_missing_packet_nums(
+        while get_missing_packet_nums(
             &alleged_packet_nums,
             &mut recvd_packet_nums,
             &mut missing_packet_nums,
         ) {
             // Convert Vec<u32> to [u8; WINDOW_SIZE*PACKET_NUM_SIZE]
-            let mut write_arr = [0 as u8; WINDOW_SIZE*PACKET_NUM_SIZE];
+            let mut write_arr = [0 as u8; WINDOW_SIZE * PACKET_NUM_SIZE];
             let mut i = 0;
             for element in missing_packet_nums.iter() {
                 let packet_num_bytes = (*element).to_le_bytes();
@@ -115,7 +115,12 @@ fn handle_transfer(mut stream: TcpStream) {
                 i += 1;
             }
             stream.write(&write_arr).unwrap();
-            // TODO: finish
+
+            // Check for tcp list of sent messages
+            stream.read(&mut alleged_packet_nums_bytes).unwrap();
+
+            // Get list of packet nums
+            get_packet_nums(&mut alleged_packet_nums, &alleged_packet_nums_bytes);
         }
     }
 
